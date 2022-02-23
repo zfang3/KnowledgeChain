@@ -61,78 +61,6 @@ def retrieve_from_hash(file_hash, file_key):
     print(saved_file)
     return saved_file
 
-@app.route('/download')
-def download():
-    return render_template('download.html' , message = "Welcome!")
-
-class _Search(object):
-    def __init__(self, app=None, *args):
-        self.app = app
-        if app is not None:
-            self.init_app(app, args)
-
-    def init_app(self, app, models):
-        app.config.setdefault('ELASTICSEARCH_URL', {"host": "localhost", "port": 9200})
-        app.config.setdefault('ELASTICSEARCH_INDEX', 'flasksearch')
-        if not hasattr(app, 'extensions'):
-            app.extensions = {}
-        app.extensions['search'] = self
-        app.extensions['search_conn'] = self.connect(app)
-        for model in models:
-            _create_index(model, app.config['ELASTICSEARCH_INDEX'], app.extensions['flasksearch_conn'])
-        if hasattr(app, 'teardown_appcontext'):
-            app.teardown_appcontext(self.teardown)
-        else:
-            app.teardown_request(self.teardown)
-
-    def connect(self, app):
-        settings = [{"host": app.config['ELASTICSEARCH_URL']['host'],
-                     "port": app.config['ELASTICSEARCH_URL']['port']}]
-        es = elasticsearch.Elasticsearch(settings)
-        return es
-
-    def teardown(self, exception):
-        ctx = stack.top
-        if ctx is not None:
-            if hasattr(ctx, 'elasticsearch_cluster'):
-                pass
-
-@app.route('/retrieve_file', methods=['POST'])
-def retrieve_file():
-
-    is_chain_replaced = blockchain.replace_chain()
-
-    if is_chain_replaced:
-        print('The nodes had different chains so the chain was replaced by the longest one.')
-    else:
-        print('All good. The chain is the largest one.')
-
-    if request.method == 'POST':
-
-        error_flag = True
-
-        if request.form['file_hash'] == '':
-            message = 'No file hash entered.'
-        elif request.form['file_key'] == '':
-            message = 'No file key entered.'
-        else:
-            error_flag = False
-            file_key = request.form['file_key']
-            file_hash = request.form['file_hash']
-            try:
-                file_path = retrieve_from_hash(file_hash, file_key)
-            except Exception as err:
-                message = str(err)
-                error_flag = True
-                if "ConnectionError:" in message:
-                    message = "Gateway down or bad Internet!"
-
-        if error_flag == True:
-            return render_template('download.html' , message = message)
-        else:
-            return render_template('download.html' , message = "File successfully downloaded")
-
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -144,6 +72,10 @@ def home():
 @app.route('/upload')
 def upload():
     return render_template('upload.html' , message = "Welcome!")
+
+@app.route('/download')
+def download():
+    return render_template('download.html' , message = "Welcome!")
 
 @app.route('/connect_blockchain')
 def connect_blockchain():
@@ -200,6 +132,41 @@ def add_file():
             return render_template('upload.html' , message = message)
         else:
             return render_template('upload.html' , message = "File succesfully uploaded")
+
+@app.route('/retrieve_file', methods=['POST'])
+def retrieve_file():
+
+    is_chain_replaced = blockchain.replace_chain()
+
+    if is_chain_replaced:
+        print('The nodes had different chains so the chain was replaced by the longest one.')
+    else:
+        print('All good. The chain is the largest one.')
+
+    if request.method == 'POST':
+
+        error_flag = True
+
+        if request.form['file_hash'] == '':
+            message = 'No file hash entered.'
+        elif request.form['file_key'] == '':
+            message = 'No file key entered.'
+        else:
+            error_flag = False
+            file_key = request.form['file_key']
+            file_hash = request.form['file_hash']
+            try:
+                file_path = retrieve_from_hash(file_hash, file_key)
+            except Exception as err:
+                message = str(err)
+                error_flag = True
+                if "ConnectionError:" in message:
+                    message = "Gateway down or bad Internet!"
+
+        if error_flag == True:
+            return render_template('download.html' , message = message)
+        else:
+            return render_template('download.html' , message = "File successfully downloaded")
 
 # Getting the full Blockchain
 @app.route('/get_chain', methods = ['GET'])
