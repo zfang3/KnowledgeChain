@@ -32,16 +32,7 @@ def decrypt_file(file_path, file_key):
     os.rename(file_path, encrypted_file)
     pyAesCrypt.decryptFile(encrypted_file, file_path,  file_key, app.config['BUFFER_SIZE'])
 
-def encrypt_file(file_path, file_key):
-    pyAesCrypt.encryptFile(file_path, file_path + ".aes",  file_key, app.config['BUFFER_SIZE'])
 
-def hash_user_file(user_file, file_key):
-    encrypt_file(user_file, file_key)
-    encrypted_file_path = user_file + ".aes"
-    client = ipfshttpclient.connect('/dns/ipfs.infura.io/tcp/5001/https')
-    response = client.add(encrypted_file_path)
-    file_hash = response['Hash']
-    return file_hash
 
 def retrieve_from_hash(file_hash, file_key):
     client = ipfshttpclient.connect('/dns/ipfs.infura.io/tcp/5001/https')
@@ -65,7 +56,37 @@ def retrieve_from_hash(file_hash, file_key):
 def download():
     return render_template('download.html' , message = "Welcome!")
 
+class _Search(object):
+    def __init__(self, app=None, *args):
+        self.app = app
+        if app is not None:
+            self.init_app(app, args)
 
+    def init_app(self, app, models):
+        app.config.setdefault('ELASTICSEARCH_URL', {"host": "localhost", "port": 9200})
+        app.config.setdefault('ELASTICSEARCH_INDEX', 'flasksearch')
+        if not hasattr(app, 'extensions'):
+            app.extensions = {}
+        app.extensions['search'] = self
+        app.extensions['search_conn'] = self.connect(app)
+        for model in models:
+            _create_index(model, app.config['ELASTICSEARCH_INDEX'], app.extensions['flasksearch_conn'])
+        if hasattr(app, 'teardown_appcontext'):
+            app.teardown_appcontext(self.teardown)
+        else:
+            app.teardown_request(self.teardown)
+
+    def connect(self, app):
+        settings = [{"host": app.config['ELASTICSEARCH_URL']['host'],
+                     "port": app.config['ELASTICSEARCH_URL']['port']}]
+        es = elasticsearch.Elasticsearch(settings)
+        return es
+
+    def teardown(self, exception):
+        ctx = stack.top
+        if ctx is not None:
+            if hasattr(ctx, 'elasticsearch_cluster'):
+                pass
 
 @app.route('/retrieve_file', methods=['POST'])
 def retrieve_file():
